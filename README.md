@@ -110,21 +110,52 @@ The API will be available at http://127.0.0.1:8000.
 Interactive API documentation is available at http://127.0.0.1:8000/docs.
 ```
 
-### 2. Set Up the Frontend
+## 2. Set Up the Frontend
 
-Open a second terminal in the project directory:
-```
-powershell
+Open a **second terminal** in the project and navigate to the `Frontend/` directory.
+
+### Install dependencies and start the frontend
+
+**Windows (PowerShell):**
+
+```powershell
+cd Frontend
 npm install
 npm run dev
+```
+
+**macOS / Linux:**
+
+```bash
+cd Frontend
+npm install
+npm run dev
+```
+
 Open the local URL printed by Vite in your terminal, usually `http://localhost:5173`.
-The dashboard requests `http://127.0.0.1:8000/api/summary` by default. To use a backend on another local port, set Vite's `VITE_API_BASE_URL` before starting the frontend. For example, in PowerShell:
+
+### Configure the backend URL (optional)
+
+By default, the dashboard requests `http://127.0.0.1:8000/api/summary`.
+
+If your backend is running on another port, set `VITE_API_BASE_URL` to the backend's base URL, **without** `/api/summary`, and restart the frontend development server.
+
+For example, if your backend runs on port `8001`:
+
+**Windows (PowerShell):**
+
 ```powershell
 $env:VITE_API_BASE_URL = "http://127.0.0.1:8001"
 npm run dev
 ```
 
-On macOS or Linux, run `VITE_API_BASE_URL=http://127.0.0.1:8001 npm run dev` from `Frontend/`. Vite reads this setting at startup; restart the dev server after changing it. The value is the backend base URL (without `/api/summary`), and the frontend appends that route.
+**macOS / Linux:**
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:8001 npm run dev
+```
+
+These environment-variable commands apply to the terminal session in which you run them. The frontend appends `/api/summary` to the configured backend base URL.
 
 ### 3. Optional: Configure VirusTotal
 
