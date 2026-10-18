@@ -71,55 +71,50 @@ Install the following before running the project:
 - Node.js and npm
 - Git (optional, for cloning the repository)
 
-### 1. Set up the backend
+### 1. Set Up the Backend
 
-Open a terminal in the project directory and run:
+Open a terminal in the TRUSTNET project directory (the folder containing `api.py`) and run:
 
 ```powershell
-cd Backend
 python -m venv .venv
-```
 
 Activate the virtual environment on Windows:
 
-```powershell
 .\.venv\Scripts\Activate.ps1
-```
 
 Install the required Python packages:
 
-```powershell
 python -m pip install fastapi "uvicorn[standard]" requests python-dotenv
-```
 
 Start the backend API:
 
-```powershell
-uvicorn api:app --reload
+python -m uvicorn api:app --reload --host 127.0.0.1 --port 8000
+
+The API will be available at http://127.0.0.1:8000.
+
+Interactive API documentation is available at http://127.0.0.1:8000/docs.
 ```
 
-The API will be available at `http://127.0.0.1:8000`.
-
-Interactive API documentation is available at `http://127.0.0.1:8000/docs`.
-
-### 2. Set up the frontend
+### 2. Set Up the Frontend
 
 Open a second terminal in the project directory:
 
-```powershell
-cd Frontend
+powershell
 npm install
 npm run dev
 ```
-
+```
 Open the local URL printed by Vite in your terminal, usually `http://localhost:5173`.
 
 ### 3. Optional: Configure VirusTotal
 
-VirusTotal integration requires an API key. If you choose to enable it, create a `.env` file inside `Backend/` containing:
+VirusTotal integration requires an API key. If you choose to enable it, create a `.env` file in the backend project directory and add:
 
-```text
-VIRUSTOTAL_API_KEY=your_api_key_here
+```env
+VIRUSTOTAL_API_KEY=your_virustotal_api_key
+```
+
+**Security:** Never commit your `.env` file or expose your API key publicly.
 ```
 
 Replace the placeholder with your own key. Never commit your `.env` file or publish your API key.
