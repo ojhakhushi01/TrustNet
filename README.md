@@ -113,7 +113,7 @@ Interactive API documentation is available at http://127.0.0.1:8000/docs.
 ### 2. Set Up the Frontend
 
 Open a second terminal in the project directory:
-
+```
 powershell
 npm install
 npm run dev
@@ -121,7 +121,7 @@ npm run dev
 ```
 Open the local URL printed by Vite in your terminal, usually `http://localhost:5173`.
 The dashboard requests `http://127.0.0.1:8000/api/summary` by default. To use a backend on another local port, set Vite's `VITE_API_BASE_URL` before starting the frontend. For example, in PowerShell:
-
+```
 ```powershell
 $env:VITE_API_BASE_URL = "http://127.0.0.1:8001"
 npm run dev
