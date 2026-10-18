@@ -88,27 +88,37 @@ Install the following before running the project:
 
 ### 1. Set Up the Backend
 
-Open a terminal in the TRUSTNET project directory (the folder containing `api.py`) and run:
+Open a terminal in the TrustNet backend project directory (the folder containing `api.py`).
+
+#### Create a virtual environment
 
 ```powershell
 python -m venv .venv
-
-Activate the virtual environment on Windows:
-
-.\.venv\Scripts\Activate.ps1
-
-Install the required Python packages:
-
-python -m pip install fastapi "uvicorn[standard]" requests python-dotenv
-
-Start the backend API:
-
-python -m uvicorn api:app --reload --host 127.0.0.1 --port 8000
-
-The API will be available at http://127.0.0.1:8000.
-
-Interactive API documentation is available at http://127.0.0.1:8000/docs.
 ```
+
+#### Activate the virtual environment (Windows PowerShell)
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+If PowerShell blocks script execution, you may need to adjust the execution policy for the current terminal session.
+
+#### Install the required Python packages
+
+```powershell
+python -m pip install fastapi "uvicorn[standard]" requests python-dotenv
+```
+
+#### Start the backend API
+
+```powershell
+python -m uvicorn api:app --reload --host 127.0.0.1 --port 8000
+```
+
+The API will be available at `http://127.0.0.1:8000`.
+
+Interactive API documentation is available at `http://127.0.0.1:8000/docs`.
 
 ## 2. Set Up the Frontend
 
@@ -134,28 +144,6 @@ npm run dev
 
 Open the local URL printed by Vite in your terminal, usually `http://localhost:5173`.
 
-### Configure the backend URL (optional)
-
-By default, the dashboard requests `http://127.0.0.1:8000/api/summary`.
-
-If your backend is running on another port, set `VITE_API_BASE_URL` to the backend's base URL, **without** `/api/summary`, and restart the frontend development server.
-
-For example, if your backend runs on port `8001`:
-
-**Windows (PowerShell):**
-
-```powershell
-$env:VITE_API_BASE_URL = "http://127.0.0.1:8001"
-npm run dev
-```
-
-**macOS / Linux:**
-
-```bash
-VITE_API_BASE_URL=http://127.0.0.1:8001 npm run dev
-```
-
-These environment-variable commands apply to the terminal session in which you run them. The frontend appends `/api/summary` to the configured backend base URL.
 
 ### 3. Optional: Configure VirusTotal
 
