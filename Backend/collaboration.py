@@ -5,7 +5,12 @@ from pathlib import Path
 from detector import detect_threats
 from privacy import sanitize_alerts, generate_privacy_report
 from fingerprint import match_fingerprints
-from virustotal import check_ip_reputation
+from virustotal import (
+    check_ip_reputation,
+    is_api_key_configured,
+    is_integration_enabled,
+    is_integration_requested,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -109,19 +114,28 @@ def show_fingerprint_matches(alerts_a, alerts_b):
 def write_summary(common_categories, matches, vt_results):
     """Write a summary based on this run's actual results."""
     lookup_successes = sum(r.get("status") == "SUCCESS" for r in vt_results)
-    lookup_skipped = sum(r.get("status") == "SKIPPED" for r in vt_results)
     lookup_errors = sum(r.get("status") == "ERROR" for r in vt_results)
+    lookup_skipped = sum(r.get("status") == "SKIPPED" for r in vt_results)
+    lookup_attempts = lookup_successes + lookup_errors
 
     summary = {
         "organizations_connected": 2,
         "privacy_filtering": "ENABLED",
         "common_categories": sorted(common_categories),
+        "category_matches": len(matches),
         "fingerprint_matches": len(matches),
+        "match_type": "CATEGORY_MATCH",
+        "match_description": (
+            "Distinct normalized event_type categories shared by both "
+            "organizations; not evidence of the same event or attack."
+        ),
         "virustotal": {
-            "integration_enabled": True,
-            "public_ip_lookups": len(vt_results),
+            "api_key_configured": is_api_key_configured(),
+            "integration_requested": is_integration_requested(),
+            "integration_enabled": is_integration_enabled(),
+            "public_ip_lookups": lookup_attempts,
             "successful_lookups": lookup_successes,
-            "skipped_non_public_indicators": lookup_skipped,
+            "skipped_indicators": lookup_skipped,
             "lookup_errors": lookup_errors,
         },
         "status": "SUCCESS",

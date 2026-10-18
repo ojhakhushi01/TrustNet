@@ -1,7 +1,7 @@
 # TRUSTNET
-### Privacy-Preserving Collaborative Threat Intelligence
+### Privacy-Aware Collaborative Threat Intelligence Prototype
 
-TRUSTNET is a cybersecurity prototype designed to help organizations detect suspicious activity in their security logs and identify shared threat patterns while reducing the exposure of sensitive information.
+TRUSTNET is a cybersecurity prototype that demonstrates rule-based alerts and sanitized category comparison using bundled sample logs. It does not implement organization-separated processing or event-level production correlation.
 
 The project combines a Python-based threat analysis backend with a React dashboard to demonstrate a privacy-aware collaborative threat intelligence workflow.
 
@@ -11,7 +11,8 @@ The project combines a Python-based threat analysis backend with a React dashboa
 - **Privacy Filtering:** Removes common sensitive identifiers from alert data and checks sanitized outputs for potential IP address and email leaks.
 - **Threat Fingerprinting:** Generates SHA-256 fingerprints based on normalized event categories.
 - **Cross-Organization Matching:** Compares threat categories identified by two sample organizations.
-- **VirusTotal Integration:** Supports optional reputation lookups for public IP addresses without submitting complete security logs.
+- **Synthetic Correlation Prototype:** An isolated, synthetic-only repeated-login correlation demonstration; not used by the production detector or API.
+- **VirusTotal Integration:** When explicitly enabled with a configured key, submits unique globally routable source-IP indicators for optional VirusTotal reputation lookups; it does not submit complete security logs.
 - **REST API:** Exposes backend analysis results through FastAPI.
 - **Interactive Dashboard:** Provides screens for threat detection, privacy and sharing, and illustrative threat matches.
 
@@ -45,7 +46,15 @@ TrustNet/
 │   ├── fingerprint.py
 │   ├── privacy.py
 │   ├── virustotal.py
+│   ├── correlation_readiness.py
+│   ├── login_correlation_prototype.py
+│   ├── synthetic_login_fixtures.py
+│   ├── demo_login_correlation.py
 │   ├── test_detector.py
+│   ├── test_fingerprint.py
+│   ├── test_api_summary.py
+│   ├── test_correlation_readiness.py
+│   ├── test_login_correlation_prototype.py
 │   ├── test_error_handling.py
 │   ├── test_virustotal.py
 │   ├── trustnet_summary.json
@@ -57,6 +66,12 @@ TrustNet/
 │   ├── public/
 │   ├── package.json
 │   └── vite.config.js
+├── docs/
+│   ├── hackathon-demo-runbook.md
+│   ├── hackathon-presentation.md
+│   ├── hackathon-judge-questions.md
+│   ├── synthetic-login-correlation-prototype.md
+│   └── threat-correlation-readiness-v1.md
 ├── .gitignore
 └── README.md
 ```
@@ -105,6 +120,14 @@ npm run dev
 ```
 ```
 Open the local URL printed by Vite in your terminal, usually `http://localhost:5173`.
+The dashboard requests `http://127.0.0.1:8000/api/summary` by default. To use a backend on another local port, set Vite's `VITE_API_BASE_URL` before starting the frontend. For example, in PowerShell:
+
+```powershell
+$env:VITE_API_BASE_URL = "http://127.0.0.1:8001"
+npm run dev
+```
+
+On macOS or Linux, run `VITE_API_BASE_URL=http://127.0.0.1:8001 npm run dev` from `Frontend/`. Vite reads this setting at startup; restart the dev server after changing it. The value is the backend base URL (without `/api/summary`), and the frontend appends that route.
 
 ### 3. Optional: Configure VirusTotal
 
@@ -117,9 +140,11 @@ VIRUSTOTAL_API_KEY=your_virustotal_api_key
 **Security:** Never commit your `.env` file or expose your API key publicly.
 ```
 
+The lookup integration is enabled by default when a key is configured. Set `VIRUSTOTAL_ENABLED=false` in the same `.env` file to explicitly disable requests. The summary reports key presence separately from effective integration enablement; it never returns the key.
+
 Replace the placeholder with your own key. Never commit your `.env` file or publish your API key.
 
-Without a configured key, VirusTotal lookups will return an error status; the integration is optional.
+Without a configured key, eligible public-IP indicators are reported as skipped and no VirusTotal request is made. Private/non-public indicators are also skipped.
 
 ## API
 
@@ -130,10 +155,10 @@ Without a configured key, VirusTotal lookups will return an error status; the in
 
 ## Testing
 
-From the `Backend` directory, run the error-handling checks:
+From the `Backend` directory, run the complete automated backend suite (VirusTotal HTTP calls are mocked and no external requests are made):
 
 ```powershell
-python test_error_handling.py
+python -m unittest discover -v
 ```
 
 To inspect the threat detection results for the sample organizations:
@@ -142,22 +167,28 @@ To inspect the threat detection results for the sample organizations:
 python test_detector.py
 ```
 
-The VirusTotal connection test requires a valid API key and internet access. Use it only when you intend to test the external integration.
+To run the isolated synthetic-only correlation evaluation:
+
+```powershell
+python demo_login_correlation.py
+```
+
+The demo prints scenario names, expected/actual outcomes, pass/fail and generic reason codes. It does not read production CSVs or call the API or external services. See [`docs/synthetic-login-correlation-prototype.md`](docs/synthetic-login-correlation-prototype.md) for the evaluation matrix and limitations.
 
 ## Current Project Status
 
-TRUSTNET is a prototype. The backend analysis pipeline and the frontend dashboard are separate at present. The dashboard uses illustrative sample records and does not yet retrieve live results from the backend API.
+TRUSTNET is a prototype. The API centrally reads both bundled organization CSVs; it is not an organization-separated deployment. The React dashboard reads summary results from the FastAPI backend. Fingerprint matches indicate shared normalized event categories; they do not independently establish that two organizations experienced the same attack. Privacy filtering checks common identifiers and patterns, but it is not a guarantee of complete anonymization or production-grade security. If VirusTotal is enabled, unique globally routable source-IP indicators may be sent to that external service; raw logs are not submitted.
 
 Fingerprint matches indicate shared event categories; they do not independently establish that two organizations experienced the same attack. Privacy filtering covers common identifiers and patterns, but it is not a guarantee of complete anonymization or production-grade security.
 
-The sample datasets are intended for demonstration and testing, not as evidence of live cyberattacks.
+The isolated synthetic repeated-login correlation prototype and its limitations are documented in [`docs/synthetic-login-correlation-prototype.md`](docs/synthetic-login-correlation-prototype.md). It does not change the dashboard or production summary API.
+
+For judge-facing startup, presentation, expected outputs, and recovery steps, see the [hackathon demo runbook](docs/hackathon-demo-runbook.md).
 
 ## Future Improvements
 
-- Connect the React dashboard to the FastAPI backend.
-- Display live threat analysis and privacy-validation results.
 - Improve fingerprinting to compare richer threat characteristics.
-- Expand privacy tests and validation for outgoing data.
+- Expand privacy validation coverage for outgoing data.
 - Add further tests and deployment documentation.
 
 ## License

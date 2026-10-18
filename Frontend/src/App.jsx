@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ShieldCheck,
   LayoutDashboard,
@@ -8,7 +8,6 @@ import {
   LockKeyhole,
   Activity,
   Bell,
-  Search,
   ShieldAlert,
   CheckCircle2,
   ArrowUpRight,
@@ -17,19 +16,68 @@ import {
 } from "lucide-react";
 import "./App.css";
 
-const initialThreats = [
-  { id: "TH-001", type: "Suspicious Login", organization: "Organization A", severity: "High", status: "Detected" },
-  { id: "TH-002", type: "Malicious Traffic", organization: "Organization B", severity: "Critical", status: "Matched" },
-  { id: "TH-003", type: "Unusual Port Activity", organization: "Organization A", severity: "Medium", status: "Detected" },
-  { id: "TH-004", type: "Repeated Failed Requests", organization: "Organization B", severity: "High", status: "Shared" },
-];
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/+$/, "");
+
+async function fetchSummary() {
+  const response = await fetch(`${API_BASE_URL}/api/summary`);
+  if (!response.ok) {
+    let message = `Backend request failed (${response.status})`;
+    try {
+      const body = await response.json();
+      if (typeof body.detail === "string") message = body.detail;
+    } catch {
+      // Keep the status-based message when the response is not JSON.
+    }
+    throw new Error(message);
+  }
+  const data = await response.json();
+  if (
+    data === null
+    || typeof data !== "object"
+    || Array.isArray(data)
+    || data.status !== "SUCCESS"
+    || !Array.isArray(data.organizations)
+    || data.organizations.some((organization) => (
+      organization === null
+      || typeof organization !== "object"
+      || Array.isArray(organization)
+    ))
+  ) {
+    throw new Error("Backend returned an incomplete summary.");
+  }
+  return data;
+}
 
 export default function App() {
   const [activePage, setActivePage] = useState("Overview");
-  const [search, setSearch] = useState("");
-  const [severityFilter, setSeverityFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadSummary = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      setSummary(await fetchSummary());
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to load backend summary.");
+      setSummary(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    fetchSummary()
+      .then((data) => { if (active) setSummary(data); })
+      .catch((requestError) => {
+        if (active) setError(requestError instanceof Error ? requestError.message : "Unable to load backend summary.");
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   const navigation = [
     { name: "Overview", icon: LayoutDashboard },
@@ -38,21 +86,10 @@ export default function App() {
     { name: "Threat Matches", icon: Fingerprint },
   ];
 
-  const threats = initialThreats.filter((threat) => {
-    const text = `${threat.id} ${threat.type} ${threat.organization} ${threat.severity} ${threat.status}`.toLowerCase();
-
-    return (
-      text.includes(search.toLowerCase()) &&
-      (severityFilter === "All" || threat.severity === severityFilter) &&
-      (statusFilter === "All" || threat.status === statusFilter)
-    );
-  });
-
-  const resetFilters = () => {
-    setSearch("");
-    setSeverityFilter("All");
-    setStatusFilter("All");
-  };
+  const organizations = summary?.organizations ?? [];
+  const commonCategories = summary?.common_categories ?? [];
+  const matches = typeof summary?.fingerprint_matches === "number" ? summary.fingerprint_matches : null;
+  const privacyPassed = organizations.length > 0 && organizations.every((organization) => organization.privacy_check === "PASSED" && organization.leak_count === 0);
 
   return (
     <div className="app-shell">
@@ -87,7 +124,7 @@ export default function App() {
             <span className="status-dot" />
             <div>
               <strong>System Status</strong>
-              <p>Prototype interface</p>
+                <p>{loading ? "Connecting to backend" : error ? "Backend unavailable" : "Summary connected"}</p>
             </div>
           </div>
           <p className="sidebar-footer">TRUSTNET · DATATHON</p>
@@ -107,8 +144,8 @@ export default function App() {
             Workspace <span>/</span> <strong>{activePage}</strong>
           </div>
           <div className="topbar-right">
-            <span className="environment">
-              <span className="status-dot" /> DEMO ENVIRONMENT
+              <span className="environment">
+              <span className="status-dot" /> {loading ? "CONNECTING" : error ? "API UNAVAILABLE" : "LIVE API SUMMARY"}
             </span>
             <button className="icon-button" aria-label="Notifications">
               <Bell size={19} />
@@ -131,13 +168,23 @@ export default function App() {
             </div>
           </section>
 
+          {error && (
+            <div className="notice api-error" role="alert">
+              <ShieldAlert size={19} />
+              <p>{error}</p>
+              <button type="button" className="reset-button" onClick={loadSummary} disabled={loading}>
+                <RotateCcw size={15} /> Retry
+              </button>
+            </div>
+          )}
+
           {activePage === "Overview" && (
             <>
               <section className="stats-grid">
-                <StatCard icon={Network} label="Connected Organizations" value="02" note="Simulated participants" color="blue" />
-                <StatCard icon={ShieldAlert} label="Threats Detected" value="04" note="Sample records" color="red" />
-                <StatCard icon={Fingerprint} label="Threat Matches" value="01" note="Illustrative match" color="purple" />
-                <StatCard icon={LockKeyhole} label="Privacy Checks" value="Demo" note="Not technically verified" color="green" />
+                <StatCard icon={Network} label="Connected Organizations" value={loading ? "—" : summary?.organizations_connected ?? "—"} note="Backend summary" color="blue" />
+                <StatCard icon={ShieldAlert} label="Threats Detected" value={loading ? "—" : summary?.total_alerts ?? "—"} note="Across both organizations" color="red" />
+                <StatCard icon={Fingerprint} label="Fingerprint Matches" value={loading ? "—" : matches ?? "—"} note={summary?.match_type === "CATEGORY_MATCH" ? "Shared category matches" : "From backend summary"} color="purple" />
+                <StatCard icon={LockKeyhole} label="Privacy Checks" value={loading || !summary ? "—" : privacyPassed ? "Passed" : "Review"} note={loading ? "Checking backend" : summary ? "Backend validation status" : "Unavailable"} color="green" />
               </section>
 
               <section className="content-grid">
@@ -145,35 +192,40 @@ export default function App() {
                   <div className="panel-heading">
                     <div>
                       <h3>Recent Threat Activity</h3>
-                      <p>Illustrative security events from both organizations</p>
+                      <p>Alert totals reported by the backend</p>
                     </div>
                     <button className="text-button" onClick={() => setActivePage("Threat Detection")}>
                       View all <ArrowUpRight size={15} />
                     </button>
                   </div>
-                  <ThreatTable threats={initialThreats} />
+                  {loading ? <p className="empty-state">Loading organization summary…</p> : <OrganizationSummary organizations={organizations} />}
                 </div>
 
                 <div className="panel collaboration-panel">
                   <div className="panel-heading">
                     <div>
                       <h3>Collaboration Network</h3>
-                      <p>Simulated participants</p>
+                      <p>Organizations analyzed by the backend</p>
                     </div>
                     <Network size={19} className="muted-icon" />
                   </div>
 
-                  <Organization name="Organization A" />
+                  <Organization name={organizations[0]?.name ?? "Organization A"} alertCount={organizations[0]?.alert_count} loading={loading} />
                   <div className="connection-line">
                     <span />
-                    <div><LockKeyhole size={15} /> Protected exchange demo</div>
+                    <div><LockKeyhole size={15} /> {loading ? "Checking privacy status" : privacyPassed ? "Privacy checks passed" : "Privacy status unavailable"}</div>
                     <span />
                   </div>
-                  <Organization name="Organization B" purple />
+                  <Organization name={organizations[1]?.name ?? "Organization B"} alertCount={organizations[1]?.alert_count} loading={loading} purple />
+
+                  <div className="summary-detail">
+                    <strong>VirusTotal lookups</strong>
+                    <span>{loading ? "Loading…" : summary?.virustotal ? `${summary.virustotal.integration_enabled ? "Enabled" : "Disabled"} · ${summary.virustotal.successful_lookups} successful · ${summary.virustotal.lookup_errors} errors · ${summary.virustotal.public_ip_lookups} public IPs checked · ${summary.virustotal.skipped_non_public_indicators} non-public skipped` : "Unavailable"}</span>
+                  </div>
 
                   <div className="privacy-note">
                     <ShieldCheck size={18} />
-                    <p>Intended workflow: exchange permitted threat representations, not original security logs.</p>
+                    <p>{summary?.note ?? "The backend summary reports aggregate results. Raw security logs are not displayed here."}</p>
                   </div>
                 </div>
               </section>
@@ -208,54 +260,13 @@ export default function App() {
             <section className="panel page-panel">
               <div className="panel-heading">
                 <div>
-                  <h3>Threat Detection Records</h3>
-                  <p>Search and filter illustrative threat records.</p>
+                  <h3>Organization Alert Summary</h3>
+                    <p>Summary API provides organization totals and shared categories, not individual alert records.</p>
                 </div>
-                <span className="record-count">{threats.length} records</span>
+                <span className="record-count">{loading ? "Loading…" : `${summary?.total_alerts ?? 0} alerts`}</span>
               </div>
 
-              <div className="filter-toolbar">
-                <div className="search-box">
-                  <Search size={18} />
-                  <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search threats, IDs, organizations..."
-                    aria-label="Search threats"
-                  />
-                </div>
-
-                <select
-                  className="filter-select"
-                  value={severityFilter}
-                  onChange={(event) => setSeverityFilter(event.target.value)}
-                  aria-label="Filter by severity"
-                >
-                  <option value="All">All severities</option>
-                  <option value="Critical">Critical</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                </select>
-
-                <select
-                  className="filter-select"
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value)}
-                  aria-label="Filter by status"
-                >
-                  <option value="All">All statuses</option>
-                  <option value="Detected">Detected</option>
-                  <option value="Matched">Matched</option>
-                  <option value="Shared">Shared</option>
-                </select>
-
-                <button type="button" className="reset-button" onClick={resetFilters}>
-                  <RotateCcw size={15} />
-                  Reset
-                </button>
-              </div>
-
-              <ThreatTable threats={threats} />
+              {loading ? <p className="empty-state">Loading organization summary…</p> : <OrganizationSummary organizations={organizations} />}
             </section>
           )}
 
@@ -264,19 +275,16 @@ export default function App() {
               <div className="panel-heading">
                 <div>
                   <h3>Privacy & Sharing</h3>
-                  <p>Illustrative data-handling policy for TRUSTNET.</p>
+                  <p>Privacy validation results returned by the backend summary.</p>
                 </div>
                 <LockKeyhole size={22} className="muted-icon" />
               </div>
               <div className="privacy-grid">
-                <PrivacyItem title="Original security logs" status="Stay local" desc="Raw logs should remain with their source organization." />
-                <PrivacyItem title="Direct identifiers" status="Remove or transform" desc="Exclude identities and sensitive internal details." />
-                <PrivacyItem title="Threat representation" status="Review before sharing" desc="Share only approved fields needed for collaboration." />
-                <PrivacyItem title="Privacy verification" status="Test required" desc="Inspect outgoing payloads for prohibited fields and leakage." />
+                {loading ? <p className="empty-state">Loading privacy checks…</p> : organizations.map((organization) => <PrivacyItem key={organization.name} title={organization.name} status={organization.privacy_check ?? "Unavailable"} desc={`${organization.leak_count ?? "Unknown"} potential leaks reported by backend validation.`} />)}
               </div>
               <div className="notice">
                 <ShieldAlert size={19} />
-                <p>This is a frontend demonstration. These labels do not mean that privacy controls have been technically verified.</p>
+                <p>These statuses reflect the backend's privacy validation result for this analysis. They do not guarantee complete anonymization.</p>
               </div>
             </section>
           )}
@@ -286,34 +294,32 @@ export default function App() {
               <div className="panel-heading">
                 <div>
                   <h3>Cross-Organization Threat Matches</h3>
-                  <p>Illustrative matching results for the prototype.</p>
+                  <p>Backend-reported category matches across organizations.</p>
                 </div>
                 <Fingerprint size={23} className="muted-icon" />
               </div>
               <div className="match-card">
                 <div className="match-icon"><Fingerprint size={25} /></div>
                 <div className="match-content">
-                  <span className="match-label">EXAMPLE MATCH · TH-002</span>
-                  <h3>Related malicious traffic pattern</h3>
-                  <p>Organization B has a sample threat record. Connect your matching module to determine real cross-organization matches.</p>
-                  <div className="match-organizations">
-                    <span>Organization A</span>
-                    <ArrowUpRight size={17} />
-                    <span>Organization B</span>
-                  </div>
+                  <span className="match-label">BACKEND SUMMARY</span>
+                  <h3>{loading ? "Loading matches…" : `${matches ?? "—"} fingerprint matches`}</h3>
+                  <p>{summary?.note ?? "The API reports aggregate fingerprint-match counts only; it does not provide per-match details."}</p>
                 </div>
-                <span className="severity critical">Critical</span>
+              </div>
+              <div className="category-list">
+                <h4>Shared categories ({loading ? "—" : commonCategories.length})</h4>
+                {loading ? <p className="empty-state">Loading categories…</p> : commonCategories.length ? commonCategories.map((category) => <span className="category-chip" key={category}>{category}</span>) : <p className="empty-state">No shared categories reported.</p>}
               </div>
               <div className="notice">
                 <Activity size={19} />
-                <p>Matching is illustrative until connected to the team's backend.</p>
+                <p>Fingerprint matches indicate shared categories; the API does not provide event-level evidence or prove a shared attack.</p>
               </div>
             </section>
           )}
 
           <footer className="page-footer">
             <span>TRUSTNET <span className="footer-dot">•</span> Privacy-preserving threat intelligence</span>
-            <span>Datathon prototype · Demo data</span>
+            <span>Datathon prototype · {loading ? "Loading backend" : error ? "Backend unavailable" : "Backend summary"}</span>
           </footer>
         </div>
       </main>
@@ -321,15 +327,15 @@ export default function App() {
   );
 }
 
-function Organization({ name, purple = false }) {
+function Organization({ name, alertCount, loading, purple = false }) {
   return (
     <div className="organization">
       <div className={`org-icon ${purple ? "purple" : ""}`}><Network size={20} /></div>
       <div className="org-details">
         <strong>{name}</strong>
-        <span>Local analysis node</span>
+        <span>{loading ? "Loading summary…" : `${alertCount ?? "—"} alerts reported`}</span>
       </div>
-      <span className="connected">DEMO</span>
+      <span className="connected">{loading ? "…" : alertCount == null ? "—" : "ANALYZED"}</span>
     </div>
   );
 }
@@ -345,35 +351,17 @@ function StatCard({ icon: Icon, label, value, note, color }) {
   );
 }
 
-function ThreatTable({ threats }) {
-  if (!threats.length) {
-    return <p className="empty-state">No matching records found. Try changing the filters or click Reset.</p>;
-  }
+function OrganizationSummary({ organizations }) {
+  if (!organizations.length) return <p className="empty-state">Organization summary unavailable.</p>;
 
   return (
-    <div className="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>THREAT ID</th>
-            <th>THREAT TYPE</th>
-            <th>ORGANIZATION</th>
-            <th>SEVERITY</th>
-            <th>STATUS</th>
-          </tr>
-        </thead>
-        <tbody>
-          {threats.map((threat) => (
-            <tr key={threat.id}>
-              <td className="threat-id">{threat.id}</td>
-              <td>{threat.type}</td>
-              <td>{threat.organization}</td>
-              <td><span className={`severity ${threat.severity.toLowerCase()}`}>{threat.severity}</span></td>
-              <td><span className="status-label">{threat.status}</span></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="organization-summary">
+      {organizations.map((organization) => (
+        <div className="organization-summary-row" key={organization.name}>
+          <strong>{organization.name}</strong>
+          <span>{organization.alert_count ?? "—"} alerts</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -381,7 +369,7 @@ function ThreatTable({ threats }) {
 function PrivacyItem({ title, status, desc }) {
   return (
     <div className="privacy-item">
-      <div className="privacy-item-icon"><CheckCircle2 size={19} /></div>
+      <div className="privacy-item-icon">{status === "PASSED" ? <CheckCircle2 size={19} /> : <ShieldAlert size={19} />}</div>
       <div>
         <h4>{title}</h4>
         <span>{status}</span>

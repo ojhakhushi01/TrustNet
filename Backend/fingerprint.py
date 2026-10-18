@@ -2,12 +2,27 @@ import hashlib
 import json
 
 
+def normalize_event_type(alert):
+    """Return a normalized category, or None when the alert is unusable."""
+    if not isinstance(alert, dict):
+        return None
+
+    event_type = alert.get("event_type")
+    if not isinstance(event_type, str):
+        return None
+
+    normalized = event_type.strip().lower()
+    return normalized or None
+
+
 def generate_fingerprint(alert):
     """
     Generate a normalized fingerprint based on the threat category.
     Ignores IP addresses, timestamps, and differences in alert wording.
     """
-    event_type = str(alert.get("event_type", "unknown")).strip().lower()
+    event_type = normalize_event_type(alert)
+    if event_type is None:
+        return None
 
     # Normalize the threat category
     normalized_alert = {
@@ -26,17 +41,29 @@ def generate_fingerprint(alert):
 
 
 def match_fingerprints(alerts_a, alerts_b):
-    """Find threat categories shared by both organizations."""
+    """Return distinct normalized event categories shared by both inputs.
 
-    fingerprints_a = {
-        generate_fingerprint(alert): alert
-        for alert in alerts_a
-    }
+    Invalid alerts and alerts without a non-empty string ``event_type`` are
+    ignored. A match is category-level only; it is not an event-level match.
+    """
 
-    fingerprints_b = {
-        generate_fingerprint(alert): alert
-        for alert in alerts_b
-    }
+    def fingerprints_by_category(alerts):
+        try:
+            iterator = iter(alerts)
+        except TypeError:
+            return {}
+
+        fingerprints = {}
+        for alert in iterator:
+            event_type = normalize_event_type(alert)
+            if event_type is None:
+                continue
+            fingerprint = generate_fingerprint(alert)
+            fingerprints[fingerprint] = event_type
+        return fingerprints
+
+    fingerprints_a = fingerprints_by_category(alerts_a)
+    fingerprints_b = fingerprints_by_category(alerts_b)
 
     common_fingerprints = fingerprints_a.keys() & fingerprints_b.keys()
 
@@ -45,9 +72,7 @@ def match_fingerprints(alerts_a, alerts_b):
     for fingerprint in sorted(common_fingerprints):
         matches.append({
             "fingerprint": fingerprint,
-            "event_type": fingerprints_a[fingerprint].get(
-                "event_type", "unknown"
-            ),
+            "event_type": fingerprints_a[fingerprint],
             "match_status": "CATEGORY_MATCH"
         })
 

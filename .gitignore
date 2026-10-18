@@ -21,3 +21,4 @@ __pycache__/
 *.local
 .DS_Store
 .idea/
+.pnpm-store/

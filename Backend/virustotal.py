@@ -8,13 +8,33 @@ load_dotenv()
 
 API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
 BASE_URL = "https://www.virustotal.com/api/v3"
+_FALSE_VALUES = {"0", "false", "no", "off", "disabled"}
+
+
+def is_api_key_configured():
+    """Report key presence without returning or logging the secret."""
+    return bool(API_KEY and API_KEY.strip())
+
+
+def is_integration_requested():
+    """Read the opt-out switch; enabled by default for compatibility."""
+    configured_value = os.getenv("VIRUSTOTAL_ENABLED", "true")
+    return configured_value.strip().lower() not in _FALSE_VALUES
+
+
+def is_integration_enabled():
+    """True only when enabled by configuration and a key is available."""
+    return is_integration_requested() and is_api_key_configured()
 
 
 def check_ip_reputation(ip_address):
     """Check VirusTotal for an IP's available reputation information."""
 
-    if not API_KEY:
-        return {"status": "ERROR", "message": "VirusTotal API key is missing."}
+    if not is_integration_requested():
+        return {"status": "SKIPPED", "message": "VirusTotal integration is disabled."}
+
+    if not is_api_key_configured():
+        return {"status": "SKIPPED", "message": "VirusTotal API key is not configured."}
 
     try:
         ip = ipaddress.ip_address(ip_address)
